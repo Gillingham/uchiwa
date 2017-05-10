@@ -12,75 +12,47 @@ func (d *Daemon) buildEvents() {
 	for _, e := range d.Data.Events {
 		m := e.(map[string]interface{})
 
-		// build backward compatible event object for Sensu < 0.13.0
-		if m["id"] == nil {
-
-			// build client object
-			c := m["client"]
-			delete(m, "client")
-			m["client"] = map[string]interface{}{"name": c}
-
-			// build check object
-			c = m["check"]
-			delete(m, "check")
-			m["check"] = map[string]interface{}{"name": c, "issued": m["issued"], "output": m["output"], "status": m["status"]}
-
-			// is flapping?
-			if m["action"] == false {
-				m["action"] = "create"
-			} else {
-				m["action"] = "flapping"
-			}
-
-			// remove old entries
-			delete(m, "issued")
-			delete(m, "output")
-			delete(m, "status")
-		}
-
-		// we assume the event isn't acknowledged in case we can't assert the following values
-		m["acknowledged"] = false
-
 		// get client name
-		c, ok := m["client"].(map[string]interface{})
+		clientMap, ok := m["client"].(map[string]interface{})
 		if !ok {
-			logger.Warningf("Could not assert event's client interface from %+v", c)
+			logger.Warningf("Could not assert event's client interface from %+v", clientMap)
 			continue
 		}
 
-		clientName, ok := c["name"].(string)
+		client, ok := clientMap["name"].(string)
 		if !ok {
-			logger.Warningf("Could not assert event's client name from %+v", c)
+			logger.Warningf("Could not assert event's client name from %+v", clientMap)
 			continue
 		}
 
 		// get check name
-		k, ok := m["check"].(map[string]interface{})
+		checkMap, ok := m["check"].(map[string]interface{})
 		if !ok {
-			logger.Warningf("Could not assert event's check interface from %+v", k)
+			logger.Warningf("Could not assert event's check interface from %+v", checkMap)
 			continue
 		}
 
-		checkName, ok := k["name"].(string)
+		check, ok := checkMap["name"].(string)
 		if !ok {
-			logger.Warningf("Could not assert event's check name from %+v", k)
+			logger.Warningf("Could not assert event's check name from %+v", checkMap)
 			continue
 		}
 
 		// get dc name
-		dcName, ok := m["dc"].(string)
+		dc, ok := m["dc"].(string)
 		if !ok {
 			logger.Warningf("Could not assert event's datacenter name from %+v", m)
 			continue
 		}
 
 		// Set the event unique ID
-		m["_id"] = fmt.Sprintf("%s/%s/%s", dcName, clientName, checkName)
+		m["_id"] = fmt.Sprintf("%s/%s/%s", dc, client, check)
 
-		// determine if the event is acknowledged
-		m["acknowledged"] = helpers.IsAcknowledged(checkName, clientName, dcName, d.Data.Stashes)
+		// Determine if the client is silenced
+		m["client"].(map[string]interface{})["silenced"] = helpers.IsClientSilenced(client, dc, d.Data.Silenced)
 
-		// detertermine if the client is acknowledged
-		m["client"].(map[string]interface{})["acknowledged"] = helpers.IsAcknowledged("", clientName, dcName, d.Data.Stashes)
+		// Determine if the check is silenced.
+		// See https://github.com/sensu/uchiwa/issues/602
+		m["silenced"], m["silenced_by"] = helpers.IsCheckSilenced(checkMap, client, dc, d.Data.Silenced)
 	}
 }

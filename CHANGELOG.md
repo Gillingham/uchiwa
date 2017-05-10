@@ -1,3 +1,226 @@
+### 0.25.1 (2017-05-10)
+#### Bug Fixes
+- Fix checkboxes in the checks view -
+[Issue #681](https://github.com/sensu/uchiwa/issues/681)
+
+### 0.25.0 (2017-05-05)
+#### Features
+- Client creation is now possible from the clients view -
+[PR #678](https://github.com/sensu/uchiwa/pull/678)
+- Client edition is now possible for all clients -
+[PR #678](https://github.com/sensu/uchiwa/pull/678)
+- Identify flapping checks in the events view -
+[Issue #673](https://github.com/sensu/uchiwa/issues/673)
+
+#### Bug Fixes
+- Properly wrap text with URLs in the client view -
+[Issue #679](https://github.com/sensu/uchiwa/issues/679)
+- Fix bulk silencing for clients with similar names -
+[Issue #677](https://github.com/sensu/uchiwa/issues/677)
+
+#### Other
+- Add protection against Clickjack/UI Redress attacks -
+[PR #680](https://github.com/sensu/uchiwa/pull/680)
+
+### 0.24.0 (2017-04-13)
+#### Features
+- Add a check view - [Issue #672](https://github.com/sensu/uchiwa/issues/672)
+- Add a 'not healthy' option to status filter in clients view -
+[Issue #445](https://github.com/sensu/uchiwa/issues/445)
+
+#### Bug Fixes
+- Fix regex queries on fields within the check or client object -
+[Issue #674](https://github.com/sensu/uchiwa/issues/674)
+
+#### Other
+- Shorten long URLs in the client view -
+[Issue #629](https://github.com/sensu/uchiwa/issues/629)
+- Prevent a user from accessing the login page if authentication is disabled -
+[PR #155](https://github.com/sensu/uchiwa-web/pull/155)
+- Force the browser location to the login page upon logout -
+[PR #154](https://github.com/sensu/uchiwa-web/pull/154)
+- Replace Godeps with govendor for Go vendoring -
+[Commit 91fd100](https://github.com/sensu/uchiwa/commit/91fd1009bf207ee8ffbf674f88cc6491a2b186d6)
+
+### 0.23.1 (2017-03-29)
+#### Bug Fixes
+- Prevent caching of deprecated assets when upgrading -
+[Issue #666](https://github.com/sensu/uchiwa/issues/666)
+- Fix bulk silencing when choosing a duration and/or a reason -
+[Issue #667](https://github.com/sensu/uchiwa/issues/667)
+- Support negative lookahead for search queries -
+[Issue #664](https://github.com/sensu/uchiwa/issues/664)
+
+#### Other
+- Increase verbosity for datacenters connection errors -
+[Issue #663](https://github.com/sensu/uchiwa/issues/663)
+- Upgrade to Angular 1.6 -
+[Issue #653](https://github.com/sensu/uchiwa/issues/653)
+- Improve responsive design with long text -
+[Issue #641](https://github.com/sensu/uchiwa/issues/641)
+
+### 0.23.0 (2017-03-24)
+#### Bug Fixes
+- Fix a visual glitch when refreshing a page on Firefox -
+[Issue #654](https://github.com/sensu/uchiwa/issues/654)
+
+#### Features
+- Refactoring of the silencing modal window -
+[Issue #644](https://github.com/sensu/uchiwa/issues/644)
+- Support edition of proxy clients in the Sensu client registry -
+[Issue #651](https://github.com/sensu/uchiwa/issues/651)
+- Display new information about Sensu servers, available since Sensu 0.28, in a new
+datacenter view - [Issue #652](https://github.com/sensu/uchiwa/issues/652)
+- Support custom favicons - [Issue #606](https://github.com/sensu/uchiwa/issues/606)
+
+#### Other
+- Set the Secure flag on authentication cookies when serving over HTTPS -
+[Issue #656](https://github.com/sensu/uchiwa/issues/656)
+
+### 0.22.2 (2017-03-10)
+#### Bug Fixes
+- Add Cross Site Request Forgery (XSRF) protection - [Issue #638](https://github.com/sensu/uchiwa/issues/638)
+
+#### Other
+- Use Travis CI for the build pipeline - [Issue #633](https://github.com/sensu/uchiwa/issues/633)
+
+### 0.22.1 (2017-02-06)
+#### Bug Fixes
+- The bulk actions menu should be shown when at least one element is selected - [Issue #138](https://github.com/sensu/uchiwa-web/pull/138)
+
+#### Other
+- Default to the new option _On resolve_ when silencing an element - [Issue #631](https://github.com/sensu/uchiwa/issues/631)
+
+### 0.22.0 (2017-01-25)
+#### Features
+- Responsive web design - [Issue #616](https://github.com/sensu/uchiwa/issues/616)
+
+#### Bug Fixes
+- Prevent reflected cross-site scripting (XSS) attacks - [Issue #618](https://github.com/sensu/uchiwa/issues/618)
+- Prevent race conditions in the logger package - [Issue #621](https://github.com/sensu/uchiwa/issues/621)
+- Fix recursive searches while using key-value queries - [Issue #624](https://github.com/sensu/uchiwa/issues/624)
+
+
+### 0.21.0 (2016-12-08)
+#### Features
+- Increase accuracy of the silenced attribute for Sensu events - [Issue #602](https://github.com/sensu/uchiwa/issues/602)
+- Add the TTL attribute to the checks view - [Issue #496](https://github.com/sensu/uchiwa/issues/496)
+
+#### Bug Fixes
+- Use relative URLs for Uchiwa API resources - [Issue #600](https://github.com/sensu/uchiwa/issues/600)
+- Fix silencing from the client view - [Issue #601](https://github.com/sensu/uchiwa/issues/601)
+- Prevent an empty popover when all clients are healthy - [Issue #607](https://github.com/sensu/uchiwa/issues/607)
+- Display the output of all checks on the client view - [Issue #612](https://github.com/sensu/uchiwa/issues/612)
+
+### 0.20.2 (2016-11-21)
+#### Bug Fixes
+- Use the ngSrc directive to prevent failed requests when loading the logo URL -
+[Issue #599](https://github.com/sensu/uchiwa/issues/599)
+- Also display the custom logo on the login page -
+[PR #128](https://github.com/sensu/uchiwa-web/pull/128)
+- Fix the user dropdown when authenticated -
+[PR #128](https://github.com/sensu/uchiwa-web/pull/128)
+- Fix the theme selection on the settings view -
+[PR #128](https://github.com/sensu/uchiwa-web/pull/128)
+- Adjust the error description if the Uchiwa backend config is unavailable -
+[Commit 5de458a](https://github.com/sensu/uchiwa/commit/5de458a)
+
+### 0.20.1 (2016-11-17)
+#### Bug Fixes
+- Prevent any caching of the index.html file in order to facilitate the upgrade
+process - [PR #597](https://github.com/sensu/uchiwa/pull/597)
+- Do not apply a filter on the status attribute in the client view -
+[PR #127](https://github.com/sensu/uchiwa-web/pull/127)
+- Fix a typographical error in the clients popover of the sidebar -
+[PR #126](https://github.com/sensu/uchiwa-web/pull/126)
+
+### 0.20.0 (2016-11-14)
+#### Features
+- Added various users-level configuration attributes to customize Uchiwa - [PR #125](https://github.com/sensu/uchiwa-web/pull/125)
+- Support regex and key:value search queries - [PR #122](https://github.com/sensu/uchiwa-web/pull/122)
+- Sidebar popovers redesign - [PR #119](https://github.com/sensu/uchiwa-web/pull/119)
+- Aggregates can now be deleted - [PR #118](https://github.com/sensu/uchiwa-web/pull/118)
+- Show the reason in the silenced view - [PR #116](https://github.com/sensu/uchiwa-web/pull/116)
+
+#### Other
+- Refactoring of the Angular services - [PR #120](https://github.com/sensu/uchiwa-web/pull/120)
+- The checks and subscriptions filters now only show values associated with a datacenter if one is selected in the datacenters filter - [PR #123](https://github.com/sensu/uchiwa-web/pull/123)
+- Improve notification messages - [Issue #467](https://github.com/sensu/uchiwa/issues/467)
+- Move iframes to their own panels in the client view - [Issue #360](https://github.com/sensu/uchiwa/issues/360)
+- Pre-0.26 Sensu APIs are now marked as deprecated in the logs - [Issue #590](https://github.com/sensu/uchiwa/issues/590)
+- Refactoring of the Angular bootstrapping - [PR #125](https://github.com/sensu/uchiwa-web/pull/125)
+- Remove underscore.js dependency - [PR #125](https://github.com/sensu/uchiwa-web/pull/125)
+
+### 0.19.0 (2016-10-16)
+#### Features
+- Allow silencing of checks and subscriptions across datacenters - [PR #112](https://github.com/sensu/uchiwa-web/pull/112)
+- Display rich aggregates data - [PR #113](https://github.com/sensu/uchiwa-web/pull/113)
+
+#### Bug Fixes
+- The pagination counter should consider the filters applied - [Issue #431](https://github.com/sensu/uchiwa/issues/431)
+- Do not panic when an encrypted password is invalid - [Issue #549](https://github.com/sensu/uchiwa/issues/549)
+
+### 0.18.2 (2016-09-19)
+#### Bug Fixes
+- Fix the silenced filters - [Issue #565](https://github.com/sensu/uchiwa/issues/565)  
+- Do not move an image from the command attribute to its own box - [Issue  #558](https://github.com/sensu/uchiwa/issues/558)
+
+#### Other
+- Allow choice of silencing entries when un-silencing an item - [PR #111](https://github.com/sensu/uchiwa-web/pull/111)  
+- Allow choice of custom expiration when creating a silence entry - [Issue #570](https://github.com/sensu/uchiwa/issues/570)  
+- The /health endpoint can return a 503 HTTP response code on error - [Issue #557](https://github.com/sensu/uchiwa/issues/557)
+
+### 0.18.1 (2016-09-09)
+#### Bug Fixes
+- Fix silencing with no expiration - [PR #107](https://github.com/sensu/uchiwa-web/pull/107)
+
+### 0.18.0 (2016-09-07)
+**Requires Sensu >= 0.26**
+
+#### Bug Fixes
+- Prevent race condition when using the Uchiwa filters - [Issue #543](https://github.com/sensu/uchiwa/issues/543)
+- Fix styling of the uchiwa-dark theme - [PR #105](https://github.com/sensu/uchiwa-web/pull/105)
+
+#### Features
+- Support built-in silencing in Sensu 0.26 - [Issue #539](https://github.com/sensu/uchiwa/issues/539)
+- Filter per-client subscriptions - [Issue #534](https://github.com/sensu/uchiwa/issues/534)
+- Add support for encrypted passwords - [PR #448](https://github.com/sensu/uchiwa/issues/448)
+- Display last_ok attribute in events view - [PR #96](https://github.com/sensu/uchiwa-web/pull/96)
+
+### 0.17.1 (2016-08-02)
+#### Bug Fixes
+- Remove various debugging traces - [Commit #d249aa4](https://github.com/sensu/uchiwa/commit/d249aa4)
+
+#### Other
+- Upgrade to Go 1.6.3 with vendoring support - [PR #528](https://github.com/sensu/uchiwa/pull/528)
+- The filters package now implements an interface for easier use - [PR #528](https://github.com/sensu/uchiwa/pull/528)
+- Refactoring of the authorization logic - [PR #528](https://github.com/sensu/uchiwa/pull/528)
+
+### 0.17.0 (2016-07-20)
+#### Features
+- Add API token-based authentication - [PR #525](https://github.com/sensu/uchiwa/pull/525)
+
+#### Bug Fixes
+- Prevent old alerts to be displayed inadvertently - [Issue #512](https://github.com/sensu/uchiwa/issues/512)
+- Fix iframes support - [Issue #508](https://github.com/sensu/uchiwa/issues/508)
+
+#### Other
+Use Alpine Linux as the base image for Docker images - [PR #498](https://github.com/sensu/uchiwa/pull/498)
+
+### 0.16.0 (2016-06-23)
+#### Bug Fixes
+- The stashes could not be deleted from the stashes view - [Issue #503](https://github.com/sensu/uchiwa/issues/507)
+- Incorrect client attributes could be displayed on a client view - [Issue #471](https://github.com/sensu/uchiwa/issues/471)
+- The 'Show All' option should not use the current elements number - [Issue #466](https://github.com/sensu/uchiwa/issues/466)
+- The relative timestamp was not properly calculated on a stash view - [Issue #456](https://github.com/sensu/uchiwa/issues/456)
+
+#### Other
+- Refactoring of the Uchiwa API endpoints - [PR #513](https://github.com/sensu/uchiwa/pull/513)
+
+### 0.15.0 (2016-06-02)
+#### Features
+- Add support for upcoming Sensu 0.24.0 - [PR #500](https://github.com/sensu/uchiwa/pull/500)
+
 ### 0.14.5 (2016-05-10)
 #### Bug Fixes
 - Fix i386 packages - [PR #31](https://github.com/sensu/uchiwa-build/pull/31)

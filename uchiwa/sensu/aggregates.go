@@ -2,22 +2,32 @@ package sensu
 
 import "fmt"
 
+// DeleteAggregate deletes an aggregate using its check name
+func (s *Sensu) DeleteAggregate(name string) error {
+	return s.delete(fmt.Sprintf("aggregates/%s", name))
+}
+
 // GetAggregates returns a slice of all aggregates
 func (s *Sensu) GetAggregates() ([]interface{}, error) {
 	return s.getSlice("aggregates", NoLimit)
 }
 
-// GetAggregate returns a slice of a specific aggregate corresponding to the provided check name
-func (s *Sensu) GetAggregate(check string, age int) ([]interface{}, error) {
-	return s.getSlice(fmt.Sprintf("aggregate/%s", check), NoLimit)
+// GetAggregate returns a map of a specific aggregate corresponding to the provided check name
+func (s *Sensu) GetAggregate(name string) (map[string]interface{}, error) {
+	return s.getMap(fmt.Sprintf("aggregates/%s", name))
 }
 
-// GetAggregateIssued returns a map containing the history of a specific check corresponding to the provided check name and the issued timestamp
-func (s *Sensu) GetAggregateIssued(check string, issued string) (map[string]interface{}, error) {
-	return s.getMap(fmt.Sprintf("aggregate/%s/%s", check, issued))
+// GetAggregateChecks returns a slice of all checks members of an aggregate
+func (s *Sensu) GetAggregateChecks(name string) ([]interface{}, error) {
+	return s.getSlice(fmt.Sprintf("aggregates/%s/checks", name), NoLimit)
 }
 
-// DeleteAggregate deletes an aggregate using its check name
-func (s *Sensu) DeleteAggregate(check string) error {
-	return s.delete(fmt.Sprintf("aggregate/%s", check))
+// GetAggregateClients returns a slice of all clients members of an aggregate
+func (s *Sensu) GetAggregateClients(name string) ([]interface{}, error) {
+	return s.getSlice(fmt.Sprintf("aggregates/%s/clients", name), NoLimit)
+}
+
+// GetAggregateResults returns a slice of all check result members by severity
+func (s *Sensu) GetAggregateResults(name, severity string) ([]interface{}, error) {
+	return s.getSlice(fmt.Sprintf("aggregates/%s/results/%s", name, severity), NoLimit)
 }

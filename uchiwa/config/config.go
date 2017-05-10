@@ -9,9 +9,11 @@ import (
 	"strings"
 
 	"github.com/palourde/mergo"
-	"github.com/sensu/uchiwa/uchiwa/auth"
+	"github.com/sensu/uchiwa/uchiwa/authentication"
 	"github.com/sensu/uchiwa/uchiwa/logger"
 )
+
+const obfuscatedValue = "*****"
 
 var (
 	defaultGlobalConfig = GlobalConfig{
@@ -20,16 +22,25 @@ var (
 		LogLevel: "info",
 		Refresh:  10,
 		Ldap: Ldap{
-			Port:                 389,
-			Security:             "none",
-			UserAttribute:        "sAMAccountName",
-			UserObjectClass:      "person",
-			GroupMemberAttribute: "member",
-			GroupObjectClass:     "groupOfNames",
+			LdapServer: LdapServer{
+				Port:                 389,
+				Security:             "none",
+				UserAttribute:        "sAMAccountName",
+				UserObjectClass:      "person",
+				GroupMemberAttribute: "member",
+				GroupObjectClass:     "groupOfNames",
+			},
 		},
 		Audit: Audit{
 			Level:   "default",
 			Logfile: "/var/log/sensu/sensu-enterprise-dashboard-audit.log",
+		},
+		UsersOptions: UsersOptions{
+			DateFormat:             "YYYY-MM-DD HH:mm:ss",
+			DefaultTheme:           "uchiwa-default",
+			DisableNoExpiration:    false,
+			RequireSilencingReason: false,
+			SilenceDurations:       []float32{0.25, 1, 24},
 		},
 	}
 	defaultSensuConfig = SensuConfig{
@@ -39,22 +50,26 @@ var (
 	defaultConfig = Config{
 		Uchiwa: defaultGlobalConfig,
 	}
+	// Private contains the private configuration
+	Private *Config
 )
 
-// Load retrieves a specified configuration file and return a Config struct
+// Load retrieves the Uchiwa configuration from files and directories
+// and returns the private configuration as a Config struct pointer
 func Load(file, directories string) *Config {
 	// Load the configuration file
-	conf, err := loadFile(file)
+	var err error
+	Private, err = loadFile(file)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	// Apply default configs to the configuration file
-	if err := mergo.Merge(conf, defaultConfig); err != nil {
+	if err := mergo.Merge(Private, defaultConfig); err != nil {
 		logger.Fatal(err)
 	}
-	for i := range conf.Sensu {
-		if err := mergo.Merge(&conf.Sensu[i], defaultSensuConfig); err != nil {
+	for i := range Private.Sensu {
+		if err := mergo.Merge(&Private.Sensu[i], defaultSensuConfig); err != nil {
 			logger.Fatal(err)
 		}
 	}
@@ -62,24 +77,24 @@ func Load(file, directories string) *Config {
 	if directories != "" {
 		configDir := loadDirectories(directories)
 		// Overwrite the file config with the configs from the directories
-		if err := mergo.MergeWithOverwrite(conf, configDir); err != nil {
+		if err := mergo.MergeWithOverwrite(Private, configDir); err != nil {
 			logger.Fatal(err)
 		}
 	}
 
-	conf.Sensu = initSensu(conf.Sensu)
+	Private.Sensu = initSensu(Private.Sensu)
 
 	// Support the dashboard attribute
-	if conf.Dashboard != nil {
-		conf.Uchiwa = *conf.Dashboard
+	if Private.Dashboard != nil {
+		Private.Uchiwa = *Private.Dashboard
 		// Apply the default config to the dashboard attribute
-		if err := mergo.Merge(conf, defaultConfig); err != nil {
+		if err := mergo.Merge(Private, defaultConfig); err != nil {
 			logger.Fatal(err)
 		}
 	}
 
-	conf.Uchiwa = initUchiwa(conf.Uchiwa)
-	return conf
+	Private.Uchiwa = initUchiwa(Private.Uchiwa)
+	return Private
 }
 
 // loadDirectories loads a Config struct from one or multiple directories of configuration
@@ -183,50 +198,133 @@ func initUchiwa(global GlobalConfig) GlobalConfig {
 	// Set the proper authentication driver
 	if global.Github.Server != "" {
 		global.Auth.Driver = "github"
+
+		for i := range global.Github.Roles {
+			authentication.Roles = append(authentication.Roles, global.Github.Roles[i])
+		}
 	} else if global.Gitlab.Server != "" {
 		global.Auth.Driver = "gitlab"
-	} else if global.Ldap.Server != "" {
-		global.Auth.Driver = "ldap"
-		if global.Ldap.GroupBaseDN == "" {
-			global.Ldap.GroupBaseDN = global.Ldap.BaseDN
+
+		for i := range global.Gitlab.Roles {
+			authentication.Roles = append(authentication.Roles, global.Gitlab.Roles[i])
 		}
-		if global.Ldap.UserBaseDN == "" {
-			global.Ldap.UserBaseDN = global.Ldap.BaseDN
+	} else if global.Ldap.Server != "" || len(global.Ldap.Servers) >= 1 {
+		initLdap(&global.Ldap)
+		global.Auth.Driver = "ldap"
+
+		for i := range global.Ldap.Roles {
+			authentication.Roles = append(authentication.Roles, global.Ldap.Roles[i])
+		}
+	} else if global.OIDC.Server != "" {
+		global.Auth.Driver = "oidc"
+
+		for i := range global.OIDC.Roles {
+			authentication.Roles = append(authentication.Roles, global.OIDC.Roles[i])
 		}
 	} else if global.Db.Driver != "" && global.Db.Scheme != "" {
 		global.Auth.Driver = "sql"
 	} else if len(global.Users) != 0 {
 		logger.Debug("Loading multiple users from the config")
 		global.Auth.Driver = "simple"
+
+		for i := range global.Users {
+			if global.Users[i].AccessToken != "" {
+				global.Users[i].Role.AccessToken = global.Users[i].AccessToken
+			}
+			if global.Users[i].Readonly != false {
+				global.Users[i].Role.Readonly = global.Users[i].Readonly
+			}
+			authentication.Roles = append(authentication.Roles, global.Users[i].Role)
+		}
 	} else if global.User != "" && global.Pass != "" {
 		logger.Debug("Loading single user from the config")
 		global.Auth.Driver = "simple"
 
 		// Support multiple users
-		global.Users = append(global.Users, auth.User{Username: global.User, Password: global.Pass, FullName: global.User})
+		global.Users = append(global.Users, authentication.User{Username: global.User, Password: global.Pass, FullName: global.User})
 	}
 
 	// Set the logger level
 	logger.SetLogLevel(global.LogLevel)
+
+	// Initialize the users options
+	// Set the refresh rate for frontend
+	global.UsersOptions.Refresh = global.Refresh * 1000
+
 	return global
+}
+
+func initLdap(conf *Ldap) {
+	// If we have a server defined directly in the Ldap struct, move it to the
+	// Servers slice
+	if conf.Server != "" && len(conf.Servers) == 0 {
+		conf.Servers = append(conf.Servers, conf.LdapServer)
+	}
+
+	// Apply the default config to every LDAP server
+	for i := range conf.Servers {
+		if conf.Servers[i].Server == "" {
+			logger.Fatal("Every LDAP server must have an address configured with the server attribute")
+		}
+
+		if conf.Servers[i].GroupBaseDN == "" {
+			conf.Servers[i].GroupBaseDN = conf.Servers[i].BaseDN
+		}
+
+		if conf.Servers[i].UserBaseDN == "" {
+			conf.Servers[i].UserBaseDN = conf.Servers[i].BaseDN
+		}
+
+		if err := mergo.Merge(&conf.Servers[i], defaultGlobalConfig.Ldap.LdapServer); err != nil {
+			logger.Fatal(err)
+		}
+	}
 }
 
 // GetPublic generates the public configuration
 func (c *Config) GetPublic() *Config {
 	p := new(Config)
 	p.Uchiwa = c.Uchiwa
-	p.Uchiwa.User = "*****"
-	p.Uchiwa.Pass = "*****"
-	p.Uchiwa.Users = []auth.User{}
-	p.Uchiwa.Db.Scheme = "*****"
-	p.Uchiwa.Github.ClientID = "*****"
-	p.Uchiwa.Github.ClientSecret = "*****"
-	p.Uchiwa.Ldap.BindPass = "*****"
+	p.Uchiwa.User = obfuscatedValue
+	p.Uchiwa.Pass = obfuscatedValue
+	p.Uchiwa.Users = []authentication.User{}
+	p.Uchiwa.Db.Scheme = obfuscatedValue
+	p.Uchiwa.Github.ClientID = obfuscatedValue
+	p.Uchiwa.Github.ClientSecret = obfuscatedValue
+	p.Uchiwa.Gitlab.ClientID = obfuscatedValue
+	p.Uchiwa.Gitlab.ClientSecret = obfuscatedValue
+	p.Uchiwa.Ldap.BindPass = obfuscatedValue
+	p.Uchiwa.OIDC.ClientID = obfuscatedValue
+	p.Uchiwa.OIDC.ClientSecret = obfuscatedValue
+
+	for i := range p.Uchiwa.Github.Roles {
+		p.Uchiwa.Github.Roles[i].AccessToken = obfuscatedValue
+	}
+
+	for i := range p.Uchiwa.Gitlab.Roles {
+		p.Uchiwa.Gitlab.Roles[i].AccessToken = obfuscatedValue
+	}
+
+	for i := range p.Uchiwa.Ldap.Roles {
+		p.Uchiwa.Ldap.Roles[i].AccessToken = obfuscatedValue
+	}
+
+	p.Uchiwa.Ldap.Servers = make([]LdapServer, len(c.Uchiwa.Ldap.Servers))
+	for i := range c.Uchiwa.Ldap.Servers {
+		p.Uchiwa.Ldap.Servers[i] = c.Uchiwa.Ldap.Servers[i]
+		p.Uchiwa.Ldap.Servers[i].BindPass = obfuscatedValue
+	}
+
+	for i := range p.Uchiwa.OIDC.Roles {
+		p.Uchiwa.OIDC.Roles[i].AccessToken = obfuscatedValue
+	}
+
 	p.Sensu = make([]SensuConfig, len(c.Sensu))
 	for i := range c.Sensu {
 		p.Sensu[i] = c.Sensu[i]
-		p.Sensu[i].User = "*****"
-		p.Sensu[i].Pass = "*****"
+		p.Sensu[i].User = obfuscatedValue
+		p.Sensu[i].Pass = obfuscatedValue
 	}
+
 	return p
 }

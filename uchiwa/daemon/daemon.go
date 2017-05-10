@@ -57,9 +57,11 @@ func (d *Daemon) Start(interval int, data chan *structs.Data) {
 func (d *Daemon) buildData() {
 	d.buildEvents()
 	d.buildClients()
-	d.buildChecks()
-	d.buildStashes()
+	setID(d.Data.Checks, "/")
+	setID(d.Data.Silenced, ":")
+	setID(d.Data.Stashes, "/")
 	d.BuildSubscriptions()
+	setID(d.Data.Aggregates, "/")
 	d.buildMetrics()
 	d.buildSEMetrics()
 }
@@ -78,32 +80,50 @@ func (d *Daemon) fetchData() {
 		// fetch sensu data from the datacenter
 		stashes, err := datacenter.GetStashes()
 		if err != nil {
+			logger.Debug(err)
 			logger.Warningf("Connection failed to the datacenter %s", datacenter.Name)
+			d.Data.Health.Sensu[datacenter.Name] = structs.SensuHealth{Output: err.Error(), Status: 2}
 			continue
+		}
+		silenced, err := datacenter.GetSilenced()
+		if err != nil {
+			logger.Debug(err)
+			logger.Warningf("Impossible to retrieve silenced entries from the "+
+				"datacenter %s. Silencing might not be possible, please update Sensu", datacenter.Name)
 		}
 		checks, err := datacenter.GetChecks()
 		if err != nil {
+			logger.Debug(err)
 			logger.Warningf("Connection failed to the datacenter %s", datacenter.Name)
+			d.Data.Health.Sensu[datacenter.Name] = structs.SensuHealth{Output: err.Error(), Status: 2}
 			continue
 		}
 		clients, err := datacenter.GetClients()
 		if err != nil {
+			logger.Debug(err)
 			logger.Warningf("Connection failed to the datacenter %s", datacenter.Name)
+			d.Data.Health.Sensu[datacenter.Name] = structs.SensuHealth{Output: err.Error(), Status: 2}
 			continue
 		}
 		events, err := datacenter.GetEvents()
 		if err != nil {
+			logger.Debug(err)
 			logger.Warningf("Connection failed to the datacenter %s", datacenter.Name)
+			d.Data.Health.Sensu[datacenter.Name] = structs.SensuHealth{Output: err.Error(), Status: 2}
 			continue
 		}
 		info, err := datacenter.GetInfo()
 		if err != nil {
+			logger.Debug(err)
 			logger.Warningf("Connection failed to the datacenter %s", datacenter.Name)
+			d.Data.Health.Sensu[datacenter.Name] = structs.SensuHealth{Output: err.Error(), Status: 2}
 			continue
 		}
 		aggregates, err := datacenter.GetAggregates()
 		if err != nil {
+			logger.Debug(err)
 			logger.Warningf("Connection failed to the datacenter %s", datacenter.Name)
+			d.Data.Health.Sensu[datacenter.Name] = structs.SensuHealth{Output: err.Error(), Status: 2}
 			continue
 		}
 
@@ -125,6 +145,10 @@ func (d *Daemon) fetchData() {
 			setDc(v, datacenter.Name)
 			d.Data.Stashes = append(d.Data.Stashes, v)
 		}
+		for _, v := range silenced {
+			setDc(v, datacenter.Name)
+			d.Data.Silenced = append(d.Data.Silenced, v)
+		}
 		for _, v := range checks {
 			setDc(v, datacenter.Name)
 			d.Data.Checks = append(d.Data.Checks, v)
@@ -144,11 +168,12 @@ func (d *Daemon) fetchData() {
 
 		// build datacenter
 		dc := d.buildDatacenter(&datacenter.Name, info)
-		dc.Stats["aggregates"] = len(aggregates)
-		dc.Stats["checks"] = len(checks)
-		dc.Stats["clients"] = len(clients)
-		dc.Stats["events"] = len(events)
-		dc.Stats["stashes"] = len(stashes)
+		dc.Metrics["aggregates"] = len(aggregates)
+		dc.Metrics["checks"] = len(checks)
+		dc.Metrics["clients"] = len(clients)
+		dc.Metrics["events"] = len(events)
+		dc.Metrics["silenced"] = len(silenced)
+		dc.Metrics["stashes"] = len(stashes)
 		d.Data.Dc = append(d.Data.Dc, dc)
 	}
 }

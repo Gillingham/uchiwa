@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
+	"reflect"
+	"time"
 
 	"github.com/sensu/uchiwa/uchiwa/logger"
 	"github.com/sensu/uchiwa/uchiwa/structs"
@@ -16,13 +19,20 @@ func BuildClientsMetrics(clients *[]interface{}) *structs.StatusMetrics {
 	metrics := structs.StatusMetrics{}
 
 	metrics.Total = len(*clients)
-
 	for _, c := range *clients {
 		client := c.(map[string]interface{})
 
+		silenced, ok := client["silenced"].(bool)
+		if ok { // Do not ignore the client if we don't have a silenced attribute
+			if silenced {
+				metrics.Silenced++
+				continue
+			}
+		}
+
 		status, ok := client["status"].(int)
 		if !ok {
-			logger.Warningf("Could not assert this status to an int: %+v", client["status"])
+			logger.Warningf("Could not assert the status to an int: %+v", client["status"])
 			continue
 		}
 
@@ -33,6 +43,7 @@ func BuildClientsMetrics(clients *[]interface{}) *structs.StatusMetrics {
 			metrics.Warning++
 			continue
 		} else if status == 0.0 {
+			metrics.Healthy++
 			continue
 		}
 		metrics.Unknown++
@@ -49,6 +60,14 @@ func BuildEventsMetrics(events *[]interface{}) *structs.StatusMetrics {
 
 	for _, e := range *events {
 		event := e.(map[string]interface{})
+
+		silenced, ok := event["silenced"].(bool)
+		if ok { // Do not ignore the event if we don't have a silenced attribute
+			if silenced {
+				metrics.Silenced++
+				continue
+			}
+		}
 
 		check, ok := event["check"].(map[string]interface{})
 		if !ok {
@@ -152,6 +171,11 @@ func GetInterfacesFromBytes(bytes []byte) ([]interface{}, error) {
 // GetMapFromBytes returns a map from a slice of byte
 func GetMapFromBytes(bytes []byte) (map[string]interface{}, error) {
 	var m map[string]interface{}
+
+	if len(bytes) == 0 {
+		return m, nil
+	}
+
 	if err := json.Unmarshal(bytes, &m); err != nil {
 		return nil, err
 	}
@@ -178,26 +202,127 @@ func GetIP(r *http.Request) string {
 	return ip
 }
 
-// IsAcknowledged determines if a client or a check has an associated silence stash
-func IsAcknowledged(check, client, dc string, stashes []interface{}) bool {
-	if dc == "" || client == "" || len(stashes) == 0 {
+// InterfaceToSlice takes a slice of type interface{} and returns a slice of interface
+func InterfaceToSlice(slice interface{}) ([]interface{}, error) {
+	value := reflect.ValueOf(slice)
+	if value.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("The interface provided is not a slice: %+v", slice)
+	}
+
+	result := make([]interface{}, value.Len())
+
+	for i := 0; i < value.Len(); i++ {
+		result[i] = value.Index(i).Interface()
+	}
+
+	return result, nil
+}
+
+// InterfaceToString takes a slice of interface{} a slice of string
+func InterfaceToString(i []interface{}) []string {
+	var result []string
+
+	for _, value := range i {
+		v, ok := value.(string)
+		if ok {
+			result = append(result, v)
+		}
+	}
+
+	return result
+}
+
+// IsCheckSilenced determines whether a check for a particular client is silenced.
+// Returns true if the check is silenced and a slice of silence entries IDs
+func IsCheckSilenced(check map[string]interface{}, client, dc string, silenced []interface{}) (bool, []string) {
+	var isSilenced bool
+	var isSilencedBy []string
+	var subscribers []interface{}
+
+	if dc == "" || len(silenced) == 0 {
+		return false, isSilencedBy
+	}
+
+	checkName, ok := check["name"].(string)
+	if !ok {
+		return false, isSilencedBy
+	}
+
+	if check["subscribers"] != nil {
+		subscribers, ok = check["subscribers"].([]interface{})
+		if !ok {
+			return false, isSilencedBy
+		}
+	}
+
+	for _, silence := range silenced {
+		m, ok := silence.(map[string]interface{})
+		if !ok {
+			logger.Warningf("Could not assert this silence entry to a map: %+v", silence)
+			continue
+		}
+
+		if m["dc"] != dc {
+			continue
+		}
+
+		// Check (e.g. *:check_cpu)
+		if m["id"] == fmt.Sprintf("*:%s", checkName) {
+			isSilenced = true
+			isSilencedBy = append(isSilencedBy, m["id"].(string))
+			continue
+		}
+
+		// Client subscription (e.g. client:foo:* )
+		if m["id"] == fmt.Sprintf("client:%s:*", client) {
+			isSilenced = true
+			isSilencedBy = append(isSilencedBy, m["id"].(string))
+			continue
+		}
+
+		// Client's check subscription (e.g. client:foo:check_cpu )
+		if m["id"] == fmt.Sprintf("client:%s:%s", client, checkName) {
+			isSilenced = true
+			isSilencedBy = append(isSilencedBy, m["id"].(string))
+			continue
+		}
+
+		for _, s := range subscribers {
+			subscription := s.(string)
+			// Subscription (e.g. load-balancer:* )
+			if m["id"] == fmt.Sprintf("%s:*", subscription) {
+				isSilenced = true
+				isSilencedBy = append(isSilencedBy, m["id"].(string))
+				continue
+			}
+
+			// Subscription' check (e.g. load-balancer:check_cpu)
+			if m["id"] == fmt.Sprintf("%s:%s", subscription, checkName) {
+				isSilenced = true
+				isSilencedBy = append(isSilencedBy, m["id"].(string))
+				continue
+			}
+		}
+
+	}
+
+	return isSilenced, isSilencedBy
+}
+
+// IsClientSilenced determines whether a client is silenced.
+// Returns true if the client is silenced.
+func IsClientSilenced(client, dc string, silenced []interface{}) bool {
+	if client == "" || dc == "" || len(silenced) == 0 {
 		return false
 	}
 
-	// add leading slash to check name
-	if check != "" {
-		check = fmt.Sprintf("/%s", check)
-	}
-
-	path := fmt.Sprintf("silence/%s%s", client, check)
-
-	for _, stash := range stashes {
-		m, ok := stash.(map[string]interface{})
+	for _, silence := range silenced {
+		m, ok := silence.(map[string]interface{})
 		if !ok {
 			continue
 		}
 
-		if m["path"] == path && m["dc"] == dc {
+		if m["dc"] == dc && m["id"] == fmt.Sprintf("client:%s:*", client) {
 			return true
 		}
 	}
@@ -219,4 +344,19 @@ func IsStringInArray(item string, array []string) bool {
 	}
 
 	return false
+}
+
+// RandomString generates a random string of the provided length
+func RandomString(length int) string {
+	if length == 0 {
+		length = 32
+	}
+
+	char := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	rand.Seed(time.Now().UTC().UnixNano())
+	buf := make([]byte, length)
+	for i := 0; i < length; i++ {
+		buf[i] = char[rand.Intn(len(char)-1)]
+	}
+	return string(buf)
 }
